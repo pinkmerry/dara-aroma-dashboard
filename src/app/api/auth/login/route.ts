@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createHmac, timingSafeEqual } from 'crypto';
+import { createSessionToken } from '@/lib/session';
 
 // ===== RATE LIMITING =====
 // Simple in-memory rate limiter (resets on server restart, which is fine for serverless)
@@ -62,63 +63,6 @@ function secureCompare(a: string, b: string): boolean {
     }
 }
 
-// ===== SESSION TOKEN =====
-function getSessionSecret(): string {
-    const secret = process.env.SESSION_SECRET;
-    if (!secret) {
-        // Fallback: derive from admin credentials (not ideal, but works without extra env var)
-        return createHmac('sha256', 'dara-aroma-fallback')
-            .update(process.env.ADMIN_PASSWORD || 'default')
-            .digest('hex');
-    }
-    return secret;
-}
-
-export function createSessionToken(username: string): string {
-    const payload = {
-        user: username,
-        iat: Date.now(),
-        exp: Date.now() + 7 * 24 * 60 * 60 * 1000, // 7 days
-    };
-
-    const payloadBase64 = Buffer.from(JSON.stringify(payload)).toString('base64url');
-
-    // Sign the payload with HMAC-SHA256
-    const signature = createHmac('sha256', getSessionSecret())
-        .update(payloadBase64)
-        .digest('base64url');
-
-    return `${payloadBase64}.${signature}`;
-}
-
-export function verifySessionToken(token: string): boolean {
-    try {
-        const parts = token.split('.');
-        if (parts.length !== 2) return false;
-
-        const [payloadBase64, signature] = parts;
-
-        // Verify signature
-        const expectedSignature = createHmac('sha256', getSessionSecret())
-            .update(payloadBase64)
-            .digest('base64url');
-
-        const sigBuffer = Buffer.from(signature, 'base64url');
-        const expectedBuffer = Buffer.from(expectedSignature, 'base64url');
-
-        if (sigBuffer.length !== expectedBuffer.length) return false;
-        if (!timingSafeEqual(sigBuffer, expectedBuffer)) return false;
-
-        // Verify expiration
-        const payload = JSON.parse(Buffer.from(payloadBase64, 'base64url').toString());
-        if (Date.now() > payload.exp) return false;
-
-        return true;
-    } catch {
-        return false;
-    }
-}
-
 // ===== ROUTE HANDLER =====
 export async function POST(request: NextRequest) {
     try {
@@ -166,8 +110,8 @@ export async function POST(request: NextRequest) {
             // Clear failed attempts on success
             clearAttempts(ip);
 
-            // Create signed session token
-            const sessionToken = createSessionToken(trimmedUsername);
+            // Create signed session token using jose
+            const sessionToken = await createSessionToken(trimmedUsername);
 
             const response = NextResponse.json(
                 { success: true, message: 'Login successful' },

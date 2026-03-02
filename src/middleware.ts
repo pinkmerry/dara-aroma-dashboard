@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { verifySessionToken } from '@/app/api/auth/login/route';
+import { verifySessionToken } from '@/lib/session';
 
-export function middleware(request: NextRequest) {
+export async function middleware(request: NextRequest) {
     const { pathname } = request.nextUrl;
 
     // Allow access to login page and auth API routes without authentication
@@ -27,7 +27,9 @@ export function middleware(request: NextRequest) {
     }
 
     // Validate session token signature and expiration
-    if (!verifySessionToken(sessionCookie.value)) {
+    const isValid = await verifySessionToken(sessionCookie.value);
+
+    if (!isValid) {
         // Invalid or expired token — clear cookie and redirect to login
         const loginUrl = new URL('/login', request.url);
         const response = NextResponse.redirect(loginUrl);
