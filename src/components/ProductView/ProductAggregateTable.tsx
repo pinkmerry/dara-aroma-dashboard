@@ -49,8 +49,8 @@ export default function ProductAggregateTable({ data }: Props) {
     };
 
     const getSortIconClass = (field: SortField) => {
-        if (sortField !== field) return "text-slate-600";
-        return "text-blue-400";
+        if (sortField !== field) return "text-slate-400 dark:text-slate-600";
+        return "text-blue-500 dark:text-blue-400";
     };
 
     useEffect(() => {
@@ -94,19 +94,19 @@ export default function ProductAggregateTable({ data }: Props) {
                 <table className="w-full text-sm text-left text-slate-600 dark:text-slate-400">
                     <thead className="text-xs text-slate-700 dark:text-slate-300 uppercase bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 sticky top-0 z-10">
                         <tr>
-                            <th scope="col" className="px-6 py-4 cursor-pointer hover:bg-slate-700 transition" onClick={() => toggleSort('productName')}>
+                            <th scope="col" className="px-6 py-4 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-700 transition" onClick={() => toggleSort('productName')}>
                                 <div className="flex items-center">
                                     Product Name
                                     <ArrowUpDown className={`ml-1 w-3 h-3 ${getSortIconClass('productName')}`} />
                                 </div>
                             </th>
-                            <th scope="col" className="px-6 py-4 text-right cursor-pointer hover:bg-slate-700 transition" onClick={() => toggleSort('quantitySold')}>
+                            <th scope="col" className="px-6 py-4 text-right cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-700 transition" onClick={() => toggleSort('quantitySold')}>
                                 <div className="flex items-center justify-end">
                                     Total Sold (Units)
                                     <ArrowUpDown className={`ml-1 w-3 h-3 ${getSortIconClass('quantitySold')}`} />
                                 </div>
                             </th>
-                            <th scope="col" className="px-6 py-4 text-right cursor-pointer hover:bg-slate-700 transition" onClick={() => toggleSort('totalRevenue')}>
+                            <th scope="col" className="px-6 py-4 text-right cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-700 transition" onClick={() => toggleSort('totalRevenue')}>
                                 <div className="flex items-center justify-end">
                                     Gross Revenue
                                     <ArrowUpDown className={`ml-1 w-3 h-3 ${getSortIconClass('totalRevenue')}`} />
@@ -121,8 +121,8 @@ export default function ProductAggregateTable({ data }: Props) {
                             </tr>
                         )}
                         {displayedData.map((row, i) => (
-                            <tr key={i} className="bg-slate-900 border-b border-slate-800 hover:bg-slate-50 dark:bg-slate-800/60 transition">
-                                <td className="px-6 py-4 font-medium text-slate-100 whitespace-nowrap">
+                            <tr key={i} className="bg-white dark:bg-slate-800/60 border-b border-slate-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition">
+                                <td className="px-6 py-4 font-medium text-slate-900 dark:text-slate-100 whitespace-nowrap">
                                     {row.productName}
                                 </td>
                                 <td className="px-6 py-4 text-right">
@@ -135,7 +135,7 @@ export default function ProductAggregateTable({ data }: Props) {
                         ))}
                         {/* Grand Total Row */}
                         {tableData.length > 0 && (
-                            <tr className="bg-slate-50 dark:bg-slate-800 border-t-2 border-slate-600 font-bold text-slate-100">
+                            <tr className="bg-slate-50 dark:bg-slate-800 border-t-2 border-slate-300 dark:border-slate-600 font-bold text-slate-900 dark:text-slate-100">
                                 <td className="px-6 py-4 text-right">Total</td>
                                 <td className="px-6 py-4 text-right">
                                     {tableData.reduce((acc, row) => acc + row.quantitySold, 0).toLocaleString()}
@@ -159,7 +159,7 @@ export default function ProductAggregateTable({ data }: Props) {
                         <button
                             onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                             disabled={currentPage === 1}
-                            className="px-3 py-1 bg-slate-700 text-slate-700 dark:text-slate-300 rounded disabled:opacity-50 hover:bg-slate-600 transition"
+                            className="px-3 py-1 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded disabled:opacity-50 hover:bg-slate-300 dark:hover:bg-slate-600 transition"
                         >
                             Prev
                         </button>
@@ -169,7 +169,7 @@ export default function ProductAggregateTable({ data }: Props) {
                         <button
                             onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                             disabled={currentPage === totalPages || totalPages === 0}
-                            className="px-3 py-1 bg-slate-700 text-slate-700 dark:text-slate-300 rounded disabled:opacity-50 hover:bg-slate-600 transition"
+                            className="px-3 py-1 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded disabled:opacity-50 hover:bg-slate-300 dark:hover:bg-slate-600 transition"
                         >
                             Next
                         </button>

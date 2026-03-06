@@ -30,7 +30,7 @@ export default function TopProductsChart({ data }: Props) {
             <div className="flex-1 w-full min-h-[300px]">
                 <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={chartData} layout="vertical" margin={{ top: 10, right: 30, left: 0, bottom: 10 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#334155" horizontal={false} vertical={true} />
+                        <CartesianGrid strokeDasharray="3 3" stroke="currentColor" className="text-slate-200 dark:text-slate-700" horizontal={false} vertical={true} />
                         <XAxis
                             type="number"
                             stroke="#64748b"
@@ -49,8 +49,8 @@ export default function TopProductsChart({ data }: Props) {
                             width={120}
                         />
                         <Tooltip
-                            cursor={{ fill: '#1e293b' }}
-                            contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', color: '#f8fafc', borderRadius: '8px' }}
+                            cursor={{ fill: 'rgba(0,0,0,0.05)' }}
+                            contentStyle={{ backgroundColor: 'var(--tooltip-bg, #0f172a)', borderColor: 'var(--tooltip-border, #334155)', color: '#f8fafc', borderRadius: '8px' }}
                             itemStyle={{ color: '#f8fafc' }}
                             formatter={(value: number | undefined) => [`฿${(value || 0).toLocaleString()}`, 'Revenue']}
                         />
