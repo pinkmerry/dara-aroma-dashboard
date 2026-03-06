@@ -53,6 +53,7 @@ export default function TopServicesTable({ data }: Props) {
                 <table className="w-full text-sm text-left text-slate-600 dark:text-slate-400">
                     <thead className="text-xs text-slate-700 dark:text-slate-300 uppercase bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700">
                         <tr>
+                            <th scope="col" className="px-4 py-3 text-center w-12">#</th>
                             <th scope="col" className="px-6 py-3">Service Name</th>
                             <th scope="col" className="px-6 py-3 text-right">Transactions</th>
                             <th scope="col" className="px-6 py-3 text-right">Total Hours</th>
@@ -62,25 +63,31 @@ export default function TopServicesTable({ data }: Props) {
                     <tbody>
                         {tableData.length === 0 && (
                             <tr>
-                                <td colSpan={4} className="px-6 py-4 text-center">No data available for selected filters</td>
+                                <td colSpan={5} className="px-6 py-4 text-center">No data available for selected filters</td>
                             </tr>
                         )}
-                        {displayedData.map((row, i) => (
-                            <tr key={`${row.name}-${i}`} className="bg-slate-900 border-b border-slate-800 hover:bg-slate-50 dark:bg-slate-800/60 transition">
-                                <td className="px-6 py-4 font-medium text-slate-100 whitespace-nowrap">
-                                    {row.name}
-                                </td>
-                                <td className="px-6 py-4 text-right">
-                                    {row.qty.toLocaleString()}
-                                </td>
-                                <td className="px-6 py-4 text-right">
-                                    {row.hours} h
-                                </td>
-                                <td className="px-6 py-4 text-right font-semibold text-emerald-400">
-                                    ฿{row.revenue.toLocaleString()}
-                                </td>
-                            </tr>
-                        ))}
+                        {displayedData.map((row, i) => {
+                            const rank = (currentPage - 1) * ITEMS_PER_PAGE + i + 1;
+                            return (
+                                <tr key={`${row.name}-${i}`} className="bg-white border-b border-slate-200 hover:bg-slate-100 dark:bg-slate-800/60 dark:border-slate-700 dark:hover:bg-slate-700/80 transition">
+                                    <td className="px-4 py-4 text-center font-bold text-slate-400 dark:text-slate-500">
+                                        {rank}
+                                    </td>
+                                    <td className="px-6 py-4 font-medium text-slate-900 dark:text-slate-100 whitespace-nowrap">
+                                        {row.name}
+                                    </td>
+                                    <td className="px-6 py-4 text-right text-slate-600 dark:text-slate-400">
+                                        {row.qty.toLocaleString()}
+                                    </td>
+                                    <td className="px-6 py-4 text-right text-slate-600 dark:text-slate-400">
+                                        {row.hours} h
+                                    </td>
+                                    <td className="px-6 py-4 text-right font-semibold text-emerald-600 dark:text-emerald-400">
+                                        ฿{row.revenue.toLocaleString()}
+                                    </td>
+                                </tr>
+                            );
+                        })}
                     </tbody>
                 </table>
             </div>
@@ -95,7 +102,7 @@ export default function TopServicesTable({ data }: Props) {
                         <button
                             onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                             disabled={currentPage === 1}
-                            className="px-3 py-1 bg-slate-700 text-slate-700 dark:text-slate-300 rounded disabled:opacity-50 hover:bg-slate-600 transition"
+                            className="px-3 py-1 bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-300 rounded disabled:opacity-50 hover:bg-slate-300 dark:hover:bg-slate-600 transition"
                         >
                             Prev
                         </button>
@@ -105,7 +112,7 @@ export default function TopServicesTable({ data }: Props) {
                         <button
                             onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                             disabled={currentPage === totalPages || totalPages === 0}
-                            className="px-3 py-1 bg-slate-700 text-slate-700 dark:text-slate-300 rounded disabled:opacity-50 hover:bg-slate-600 transition"
+                            className="px-3 py-1 bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-300 rounded disabled:opacity-50 hover:bg-slate-300 dark:hover:bg-slate-600 transition"
                         >
                             Next
                         </button>

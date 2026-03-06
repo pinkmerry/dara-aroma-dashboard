@@ -7,10 +7,12 @@ import {
     prepareMoMData,
     prepareYoYData,
     prepareQuarterlyData,
+    prepareMonthlyData,
     getAnalysisPeriodLabel,
     getAvailableMomOptions,
     getAvailableYoyOptions,
     getAvailableQuarterOptions,
+    getAvailableMonthlyOptions,
 } from '@/utils/aiDataPreparer';
 import {
     Sparkles,
@@ -18,6 +20,7 @@ import {
     TrendingUp,
     CalendarRange,
     BarChart3,
+    Calendar,
     ChevronDown,
     Loader2,
     AlertCircle,
@@ -60,6 +63,14 @@ const ANALYSIS_OPTIONS: AnalysisOption[] = [
         icon: BarChart3,
         gradient: 'from-violet-500 to-purple-600',
         color: 'text-violet-400',
+    },
+    {
+        type: 'monthly',
+        label: 'Monthly Deep Dive',
+        description: 'วิเคราะห์เจาะลึกรายเดือน',
+        icon: Calendar,
+        gradient: 'from-amber-500 to-orange-600',
+        color: 'text-amber-400',
     },
 ];
 
@@ -105,6 +116,8 @@ export default function AIInsightsPanel() {
                     return prepareYoYData(serviceData, periodKey);
                 case 'quarterly':
                     return prepareQuarterlyData(serviceData, periodKey);
+                case 'monthly':
+                    return prepareMonthlyData(serviceData, periodKey);
             }
         },
         [serviceData]
@@ -124,6 +137,9 @@ export default function AIInsightsPanel() {
                 break;
             case 'quarterly':
                 initialKey = getAvailableQuarterOptions(serviceData)[0]?.key;
+                break;
+            case 'monthly':
+                initialKey = getAvailableMonthlyOptions(serviceData)[0]?.key;
                 break;
         }
         setSelectedPeriodKey(initialKey);
@@ -398,6 +414,9 @@ export default function AIInsightsPanel() {
                                                         <option key={o.key} value={o.key}>{o.label}</option>
                                                     ))}
                                                     {selectedAnalysis.type === 'quarterly' && getAvailableQuarterOptions(serviceData).map(o => (
+                                                        <option key={o.key} value={o.key}>{o.label}</option>
+                                                    ))}
+                                                    {selectedAnalysis.type === 'monthly' && getAvailableMonthlyOptions(serviceData).map(o => (
                                                         <option key={o.key} value={o.key}>{o.label}</option>
                                                     ))}
                                                 </select>

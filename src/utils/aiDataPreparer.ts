@@ -1,6 +1,6 @@
 import { EnrichedTransaction } from '@/types';
 
-export type AnalysisType = 'mom' | 'yoy' | 'quarterly';
+export type AnalysisType = 'mom' | 'yoy' | 'quarterly' | 'monthly';
 
 interface MonthlyAggregate {
     year: number;
@@ -19,11 +19,21 @@ interface MonthlyAggregate {
     peakHours: { hour: number; count: number }[];
 }
 
+interface DailyAggregate {
+    date: string; // e.g. "2025-01-15"
+    dayOfWeek: string;
+    totalRevenue: number;
+    totalTransactions: number;
+    uniqueCustomers: number;
+}
+
 const THAI_MONTHS = [
     'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน',
     'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม',
     'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม',
 ];
+
+const THAI_DAYS = ['อาทิตย์', 'จันทร์', 'อังคาร', 'พุธ', 'พฤหัสบดี', 'ศุกร์', 'เสาร์'];
 
 function aggregateMonth(data: EnrichedTransaction[], year: number, month: number): MonthlyAggregate | null {
     const filtered = data.filter(d => {
@@ -99,6 +109,39 @@ function aggregateMonth(data: EnrichedTransaction[], year: number, month: number
     };
 }
 
+/**
+ * Aggregate daily data for a given month
+ */
+function aggregateDailyForMonth(data: EnrichedTransaction[], year: number, month: number): DailyAggregate[] {
+    const filtered = data.filter(d => {
+        if (!d.parsedDate) return false;
+        return d.parsedDate.getFullYear() === year && d.parsedDate.getMonth() === month;
+    });
+
+    const dailyMap: Record<string, { revenue: number; txns: number; customers: Set<string>; dayOfWeek: number }> = {};
+
+    filtered.forEach(d => {
+        if (!d.parsedDate) return;
+        const dateKey = `${d.parsedDate.getFullYear()}-${String(d.parsedDate.getMonth() + 1).padStart(2, '0')}-${String(d.parsedDate.getDate()).padStart(2, '0')}`;
+        if (!dailyMap[dateKey]) {
+            dailyMap[dateKey] = { revenue: 0, txns: 0, customers: new Set(), dayOfWeek: d.parsedDate.getDay() };
+        }
+        dailyMap[dateKey].revenue += d.netRevenue;
+        dailyMap[dateKey].txns += 1;
+        if (d['id ของลูกค้า']) dailyMap[dateKey].customers.add(d['id ของลูกค้า']);
+    });
+
+    return Object.entries(dailyMap)
+        .map(([date, info]) => ({
+            date,
+            dayOfWeek: THAI_DAYS[info.dayOfWeek],
+            totalRevenue: info.revenue,
+            totalTransactions: info.txns,
+            uniqueCustomers: info.customers.size,
+        }))
+        .sort((a, b) => a.date.localeCompare(b.date));
+}
+
 function formatAggregate(agg: MonthlyAggregate): string {
     let result = `\n📅 ${agg.label}\n`;
     result += `━━━━━━━━━━━━━━━━━━━━━━\n`;
@@ -126,6 +169,36 @@ function formatAggregate(agg: MonthlyAggregate): string {
     agg.peakHours.forEach(h => {
         result += `  - ${h.hour}:00 น. — ${h.count} รายการ\n`;
     });
+
+    return result;
+}
+
+/**
+ * Format daily breakdown data as string
+ */
+function formatDailyBreakdown(dailyData: DailyAggregate[], monthLabel: string): string {
+    if (dailyData.length === 0) return '';
+
+    let result = `\n📆 ข้อมูลรายวัน — ${monthLabel}\n`;
+    result += `━━━━━━━━━━━━━━━━━━━━━━\n`;
+    result += `วันที่ | วัน | รายได้ | รายการ | ลูกค้า\n`;
+    result += `------|------|--------|--------|-------\n`;
+
+    dailyData.forEach(d => {
+        result += `${d.date} | ${d.dayOfWeek} | ฿${d.totalRevenue.toLocaleString()} | ${d.totalTransactions} | ${d.uniqueCustomers}\n`;
+    });
+
+    // Add daily summary statistics
+    const revenues = dailyData.map(d => d.totalRevenue);
+    const avgDaily = revenues.reduce((a, b) => a + b, 0) / revenues.length;
+    const maxDay = dailyData.reduce((max, d) => d.totalRevenue > max.totalRevenue ? d : max, dailyData[0]);
+    const minDay = dailyData.reduce((min, d) => d.totalRevenue < min.totalRevenue ? d : min, dailyData[0]);
+
+    result += `\n📊 สรุปประจำวัน:\n`;
+    result += `  - รายได้เฉลี่ย/วัน: ฿${Math.round(avgDaily).toLocaleString()}\n`;
+    result += `  - วันที่ขายดีสุด: ${maxDay.date} (${maxDay.dayOfWeek}) — ฿${maxDay.totalRevenue.toLocaleString()}\n`;
+    result += `  - วันที่ขายน้อยสุด: ${minDay.date} (${minDay.dayOfWeek}) — ฿${minDay.totalRevenue.toLocaleString()}\n`;
+    result += `  - จำนวนวันที่เปิดทำการ: ${dailyData.length} วัน\n`;
 
     return result;
 }
@@ -217,7 +290,7 @@ export function getAvailableQuarterOptions(data: EnrichedTransaction[]) {
 }
 
 /**
- * Prepare data payload for MoM analysis
+ * Prepare data payload for MoM analysis — includes daily breakdown for both months
  */
 export function prepareMoMData(data: EnrichedTransaction[], baseKey?: string): string | null {
     const availableMonths = getAvailableMonths(data);
@@ -255,11 +328,19 @@ export function prepareMoMData(data: EnrichedTransaction[], baseKey?: string): s
     payload += `รายการเปลี่ยนแปลง: ${txnChange >= 0 ? '+' : ''}${txnChange.toLocaleString()}\n`;
     payload += `ลูกค้าเปลี่ยนแปลง: ${custChange >= 0 ? '+' : ''}${custChange.toLocaleString()}\n`;
 
+    // Daily breakdown for previous month
+    const prevDaily = aggregateDailyForMonth(data, previousMonth.year, previousMonth.month);
+    payload += formatDailyBreakdown(prevDaily, prevAgg.label);
+
+    // Daily breakdown for current month
+    const currentDaily = aggregateDailyForMonth(data, currentMonth.year, currentMonth.month);
+    payload += formatDailyBreakdown(currentDaily, currentAgg.label);
+
     return payload;
 }
 
 /**
- * Prepare data payload for YoY analysis
+ * Prepare data payload for YoY analysis — includes daily breakdown for both months
  */
 export function prepareYoYData(data: EnrichedTransaction[], baseKey?: string): string | null {
     const availableMonths = getAvailableMonths(data);
@@ -292,15 +373,27 @@ export function prepareYoYData(data: EnrichedTransaction[], baseKey?: string): s
 
     const revChange = currentAgg.totalRevenue - lastYearAgg.totalRevenue;
     const revPct = lastYearAgg.totalRevenue > 0 ? ((revChange / lastYearAgg.totalRevenue) * 100).toFixed(1) : 'N/A';
+    const txnChange = currentAgg.totalTransactions - lastYearAgg.totalTransactions;
+    const custChange = currentAgg.uniqueCustomers - lastYearAgg.uniqueCustomers;
 
     payload += `\n\n--- สรุปการเปลี่ยนแปลง YoY ---\n`;
     payload += `รายได้เปลี่ยนแปลง: ${revChange >= 0 ? '+' : ''}฿${revChange.toLocaleString()} (${revPct}%)\n`;
+    payload += `รายการเปลี่ยนแปลง: ${txnChange >= 0 ? '+' : ''}${txnChange.toLocaleString()}\n`;
+    payload += `ลูกค้าเปลี่ยนแปลง: ${custChange >= 0 ? '+' : ''}${custChange.toLocaleString()}\n`;
+
+    // Daily breakdown for last year month
+    const lastYearDaily = aggregateDailyForMonth(data, lastYearMonth.year, lastYearMonth.month);
+    payload += formatDailyBreakdown(lastYearDaily, lastYearAgg.label);
+
+    // Daily breakdown for current month
+    const currentDaily = aggregateDailyForMonth(data, latestMonth.year, latestMonth.month);
+    payload += formatDailyBreakdown(currentDaily, currentAgg.label);
 
     return payload;
 }
 
 /**
- * Prepare data payload for Quarterly analysis
+ * Prepare data payload for Quarterly analysis — includes daily breakdown per month
  */
 export function prepareQuarterlyData(data: EnrichedTransaction[], baseKey?: string): string | null {
     const options = getAvailableQuarterOptions(data);
@@ -343,6 +436,47 @@ export function prepareQuarterlyData(data: EnrichedTransaction[], baseKey?: stri
         payload += `รายการรวมทั้งไตรมาส: ${aggregates.reduce((s, a) => s + a.totalTransactions, 0).toLocaleString()}\n`;
     }
 
+    // Daily breakdown for each month in the quarter
+    months.forEach(m => {
+        const daily = aggregateDailyForMonth(data, m.year, m.month);
+        payload += formatDailyBreakdown(daily, `${THAI_MONTHS[m.month]} ${m.year}`);
+    });
+
+    return payload;
+}
+
+export function getAvailableMonthlyOptions(data: EnrichedTransaction[]) {
+    const months = getAvailableMonths(data);
+    return months.map(m => ({
+        key: `${m.year}-${m.month}`,
+        label: m.label,
+    }));
+}
+
+/**
+ * Prepare data payload for single Monthly analysis — includes daily breakdown
+ */
+export function prepareMonthlyData(data: EnrichedTransaction[], baseKey?: string): string | null {
+    const availableMonths = getAvailableMonths(data);
+    if (availableMonths.length === 0) return null;
+
+    let targetMonth = availableMonths[0];
+    if (baseKey) {
+        const found = availableMonths.find(m => `${m.year}-${m.month}` === baseKey);
+        if (found) targetMonth = found;
+    }
+
+    const agg = aggregateMonth(data, targetMonth.year, targetMonth.month);
+    if (!agg) return null;
+
+    let payload = `=== การวิเคราะห์รายเดือน (Monthly Deep Dive) ===\n`;
+    payload += `เดือนที่วิเคราะห์: ${agg.label}\n`;
+    payload += formatAggregate(agg);
+
+    // Daily breakdown
+    const daily = aggregateDailyForMonth(data, targetMonth.year, targetMonth.month);
+    payload += formatDailyBreakdown(daily, agg.label);
+
     return payload;
 }
 
@@ -371,6 +505,15 @@ export function getAnalysisPeriodLabel(type: AnalysisType, data: EnrichedTransac
         }
         case 'quarterly': {
             const options = getAvailableQuarterOptions(data);
+            if (options.length === 0) return 'ไม่มีข้อมูล';
+            if (baseKey) {
+                const found = options.find(o => o.key === baseKey);
+                if (found) return found.label;
+            }
+            return options[0].label;
+        }
+        case 'monthly': {
+            const options = getAvailableMonthlyOptions(data);
             if (options.length === 0) return 'ไม่มีข้อมูล';
             if (baseKey) {
                 const found = options.find(o => o.key === baseKey);
