@@ -3,12 +3,104 @@ import { streamText } from 'ai';
 
 export const maxDuration = 60;
 
-export async function POST(req: Request) {
-    const { messages, analysisType, dataPayload } = await req.json();
+// ─── Security: Input Sanitization ───
 
-    // Build the system prompt based on analysis type
+const BLOCKED_PATTERNS = [
+  /ignore\s+(all\s+)?previous\s+instructions/i,
+  /ignore\s+(all\s+)?above/i,
+  /forget\s+(all\s+)?(your\s+)?instructions/i,
+  /disregard\s+(all\s+)?(your\s+)?instructions/i,
+  /system\s*prompt/i,
+  /reveal\s+(your\s+)?instructions/i,
+  /show\s+(me\s+)?(your\s+)?prompt/i,
+  /act\s+as\s+(a|an)\s+(?!business|analyst)/i,
+  /you\s+are\s+now\s+a/i,
+  /pretend\s+(you\s+are|to\s+be)/i,
+  /jailbreak/i,
+  /DAN\s*mode/i,
+  /override\s+(your\s+)?rules/i,
+  /bypass\s+(your\s+)?restrictions/i,
+  /do\s+anything\s+now/i,
+  /new\s+instructions/i,
+  /<script/i,
+  /javascript:/i,
+  /on(error|load|click)\s*=/i,
+];
+
+function containsInjection(text: string): boolean {
+  for (const pattern of BLOCKED_PATTERNS) {
+    if (pattern.test(text)) return true;
+  }
+  return false;
+}
+
+// ─── Rate Limiting (simple in-memory) ───
+
+const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
+const RATE_LIMIT = 10; // analysis requests per window (more strict — analysis is expensive)
+const RATE_WINDOW_MS = 60 * 60 * 1000; // 1 hour
+
+function checkRateLimit(clientId: string): boolean {
+  const now = Date.now();
+  const entry = rateLimitMap.get(clientId);
+
+  if (!entry || now > entry.resetAt) {
+    rateLimitMap.set(clientId, { count: 1, resetAt: now + RATE_WINDOW_MS });
+    return true;
+  }
+
+  if (entry.count >= RATE_LIMIT) {
+    return false;
+  }
+
+  entry.count++;
+  return true;
+}
+
+// ─── Allowed analysis types ───
+
+const ALLOWED_TYPES = ['mom', 'yoy', 'quarterly', 'monthly'];
+const MAX_PAYLOAD_SIZE = 500_000; // 500KB max for data payload
+
+export async function POST(req: Request) {
+  try {
+    // Rate limiting
+    const clientIP = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || 'unknown';
+    if (!checkRateLimit(clientIP)) {
+      return new Response(
+        JSON.stringify({ error: 'คุณส่งคำขอวิเคราะห์มากเกินไป กรุณารอสักครู่แล้วลองใหม่ครับ' }),
+        { status: 429, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const body = await req.json();
+    const { messages, analysisType, dataPayload } = body;
+
+    // Validate analysis type
+    if (!analysisType || !ALLOWED_TYPES.includes(analysisType)) {
+      return new Response(
+        JSON.stringify({ error: 'ประเภทการวิเคราะห์ไม่ถูกต้อง' }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Validate and limit data payload size
+    if (typeof dataPayload !== 'string' || dataPayload.length > MAX_PAYLOAD_SIZE) {
+      return new Response(
+        JSON.stringify({ error: 'ข้อมูลมีขนาดใหญ่เกินไป กรุณาลดช่วงเวลาที่เลือกแล้วลองใหม่ครับ' }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Check for prompt injection in data payload
+    if (containsInjection(dataPayload)) {
+      return new Response(
+        JSON.stringify({ error: 'ขออภัยครับ ข้อมูลมีเนื้อหาที่ไม่สามารถประมวลผลได้' }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } }
+      );
+    }    // Build the system prompt based on analysis type
     const systemPrompts: Record<string, string> = {
-        mom: `You are a senior business analyst for a massage and spa business dashboard.
+      mom: `You are a senior business analyst for a massage and spa business dashboard.
 
 Your job is to analyze Month-over-Month (MoM) performance by comparing exactly 2 consecutive months selected by the user, such as Jan vs Feb, or Feb vs Mar.
 
@@ -136,7 +228,6 @@ Output format:
 7. Business Interpretation for a Massage Shop
 8. Forecast for Next Month
 9. Recommended Actions
-10. Sources / External Trend Notes (only if used)
 
 Style requirements:
 - Write clearly for business owners, not data scientists
@@ -149,7 +240,7 @@ Style requirements:
 - ถ้ามีตัวเลขสำคัญ ให้เน้นด้วย **bold**
 - ตอบกระชับแต่ครบถ้วน`,
 
-        yoy: `You are a senior business analyst for a massage and spa business dashboard.
+      yoy: `You are a senior business analyst for a massage and spa business dashboard.
 
 Your job is to analyze Year-over-Year (YoY) performance by comparing the same month across different years, based on the user's selected date scope.
 
@@ -271,7 +362,6 @@ Output format:
 7. Business Meaning for a Massage Shop
 8. Forecast and Sustainability View
 9. Recommended Actions
-10. Sources / External Trend Notes (only if used)
 
 Style requirements:
 - Write for management decision-making
@@ -283,7 +373,7 @@ Style requirements:
 - ถ้ามีตัวเลขสำคัญ ให้เน้นด้วย **bold**
 - ตอบกระชับแต่ครบถ้วน`,
 
-        quarterly: `You are a senior business analyst for a massage and spa business dashboard.
+      quarterly: `You are a senior business analyst for a massage and spa business dashboard.
 
 Your job is to analyze Quarterly performance for a massage shop. You will receive data for a single quarter (up to 3 months), broken down by month.
 
@@ -411,7 +501,6 @@ Output format:
 7. What This Means for the Massage Business
 8. Next Quarter Outlook
 9. Recommended Actions
-10. Sources / External Trend Notes (only if used)
 
 Style requirements:
 - Think like a strategic business reviewer
@@ -422,7 +511,7 @@ Style requirements:
 - ถ้ามีตัวเลขสำคัญ ให้เน้นด้วย **bold**
 - ตอบกระชับแต่ครบถ้วน`,
 
-        monthly: `You are a senior business analyst for a massage and spa business dashboard.
+      monthly: `You are a senior business analyst for a massage and spa business dashboard.
 
 Your job is to analyze one selected month in depth for a massage shop. This is not a comparison-first task. Your main purpose is to deeply inspect the selected month, detect what stands out inside the month, and explain what the owner should know.
 
@@ -547,7 +636,6 @@ Output format:
 7. What It Means for the Massage Business
 8. Near-Term Forecast
 9. Recommended Actions
-10. Sources / External Trend Notes (only if used)
 
 Style requirements:
 - Be observant and practical
@@ -562,15 +650,22 @@ Style requirements:
     const systemPrompt = systemPrompts[analysisType] || systemPrompts.mom;
 
     const result = streamText({
-        model: google('gemini-2.5-flash'),
-        system: systemPrompt,
-        messages: [
-            {
-                role: 'user',
-                content: `นี่คือข้อมูลสำหรับการวิเคราะห์:\n\n${dataPayload}\n\nกรุณาวิเคราะห์ข้อมูลนี้ตามที่กำหนด`,
-            },
-        ],
+      model: google('gemini-2.5-flash'),
+      system: systemPrompt,
+      messages: [
+        {
+          role: 'user',
+          content: `นี่คือข้อมูลสำหรับการวิเคราะห์:\n\n${dataPayload}\n\nกรุณาวิเคราะห์ข้อมูลนี้ตามที่กำหนด`,
+        },
+      ],
     });
 
     return result.toTextStreamResponse();
+  } catch (error) {
+    console.error('Chat API error:', error);
+    return new Response(
+      JSON.stringify({ error: 'เกิดข้อผิดพลาดในการประมวลผล กรุณาลองใหม่อีกครั้งครับ' }),
+      { status: 500, headers: { 'Content-Type': 'application/json' } }
+    );
+  }
 }

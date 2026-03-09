@@ -39,3 +39,8 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+dashboard-final.png
+dashboard-step1.png
+dashboard-step2.png
+test.js
+test_ui.js

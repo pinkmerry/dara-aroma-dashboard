@@ -11,6 +11,7 @@ import ChannelPerformanceChart from './ChannelPerformanceChart';
 import TopServicesTable from './TopServicesTable';
 import TopSpendersChart from './TopSpendersChart';
 import TrendSummaryChart from './TrendSummaryChart';
+import StaffPerformanceChart from './StaffPerformanceChart';
 import AIInsightsPanel from './AIInsightsPanel';
 
 export default function ServiceDashboard() {
@@ -95,6 +96,10 @@ export default function ServiceDashboard() {
 
             <div className="bg-white/80 dark:bg-slate-800/60 backdrop-blur-sm rounded-xl border border-slate-200 dark:border-slate-700/50 p-4 min-h-80 shadow-md mt-6 transition-colors">
                 <TopSpendersChart data={filteredData} />
+            </div>
+
+            <div className="bg-white/80 dark:bg-slate-800/60 backdrop-blur-sm rounded-xl border border-slate-200 dark:border-slate-700/50 p-4 min-h-80 shadow-md mt-6 transition-colors">
+                <StaffPerformanceChart data={filteredData} />
             </div>
 
         </div>

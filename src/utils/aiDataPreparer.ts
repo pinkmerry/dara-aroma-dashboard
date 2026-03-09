@@ -204,6 +204,81 @@ function formatDailyBreakdown(dailyData: DailyAggregate[], monthLabel: string): 
 }
 
 /**
+ * Aggregate staff performance for a given month
+ */
+function aggregateStaffForMonth(data: EnrichedTransaction[], year: number, month: number): { name: string; serviceCount: number; revenue: number; commission: number; tips: number; topService: string }[] {
+    const filtered = data.filter(d => {
+        if (!d.parsedDate) return false;
+        return d.parsedDate.getFullYear() === year && d.parsedDate.getMonth() === month;
+    });
+
+    const staffMap: Record<string, {
+        serviceCount: number;
+        revenue: number;
+        commission: number;
+        tips: number;
+        services: Record<string, number>;
+    }> = {};
+
+    filtered.forEach(d => {
+        const staffName = d['พนักงาน (1)']?.trim() || 'ไม่ระบุพนักงาน';
+
+        if (!staffMap[staffName]) {
+            staffMap[staffName] = { serviceCount: 0, revenue: 0, commission: 0, tips: 0, services: {} };
+        }
+
+        staffMap[staffName].serviceCount += 1;
+        staffMap[staffName].revenue += d.netRevenue;
+        staffMap[staffName].commission += parseFloat(d['ค่ามือหมอนวด (1)'] || '0') || 0;
+        staffMap[staffName].tips += parseFloat(d['ทิปหมอนวด (1)'] || '0') || 0;
+
+        const service = d['รายการ']?.trim() || 'ไม่ระบุ';
+        staffMap[staffName].services[service] = (staffMap[staffName].services[service] || 0) + 1;
+    });
+
+    return Object.entries(staffMap)
+        .map(([name, info]) => {
+            const topService = Object.entries(info.services).sort((a, b) => b[1] - a[1])[0]?.[0] || 'N/A';
+            return {
+                name,
+                serviceCount: info.serviceCount,
+                revenue: info.revenue,
+                commission: info.commission,
+                tips: info.tips,
+                topService,
+            };
+        })
+        .sort((a, b) => b.revenue - a.revenue);
+}
+
+/**
+ * Format staff performance data as string for AI analysis
+ */
+function formatStaffPerformance(staffData: { name: string; serviceCount: number; revenue: number; commission: number; tips: number; topService: string }[], monthLabel: string): string {
+    if (staffData.length === 0) return '';
+
+    let result = `\n👨‍⚕️ ผลงานพนักงาน — ${monthLabel}\n`;
+    result += `━━━━━━━━━━━━━━━━━━━━━━\n`;
+    result += `ชื่อ | จำนวนงาน | รายได้ | ค่ามือ | ทิป | บริการหลัก\n`;
+    result += `------|--------|--------|--------|------|--------\n`;
+
+    staffData.forEach((s, i) => {
+        result += `${i + 1}. ${s.name} | ${s.serviceCount} | ฿${s.revenue.toLocaleString()} | ฿${s.commission.toLocaleString()} | ฿${s.tips.toLocaleString()} | ${s.topService}\n`;
+    });
+
+    const totalRevenue = staffData.reduce((sum, s) => sum + s.revenue, 0);
+    const totalCommission = staffData.reduce((sum, s) => sum + s.commission, 0);
+    const totalTips = staffData.reduce((sum, s) => sum + s.tips, 0);
+    result += `\n📊 สรุปพนักงาน:\n`;
+    result += `  - จำนวนพนักงานทั้งหมด: ${staffData.length} คน\n`;
+    result += `  - รายได้รวม: ฿${totalRevenue.toLocaleString()}\n`;
+    result += `  - ค่ามือรวม: ฿${totalCommission.toLocaleString()}\n`;
+    result += `  - ทิปรวม: ฿${totalTips.toLocaleString()}\n`;
+
+    return result;
+}
+
+/**
  * Get all available months from the data
  */
 export function getAvailableMonths(data: EnrichedTransaction[]): { year: number; month: number; label: string }[] {
@@ -336,6 +411,12 @@ export function prepareMoMData(data: EnrichedTransaction[], baseKey?: string): s
     const currentDaily = aggregateDailyForMonth(data, currentMonth.year, currentMonth.month);
     payload += formatDailyBreakdown(currentDaily, currentAgg.label);
 
+    // Staff performance for both months
+    const prevStaff = aggregateStaffForMonth(data, previousMonth.year, previousMonth.month);
+    payload += formatStaffPerformance(prevStaff, prevAgg.label);
+    const currentStaff = aggregateStaffForMonth(data, currentMonth.year, currentMonth.month);
+    payload += formatStaffPerformance(currentStaff, currentAgg.label);
+
     return payload;
 }
 
@@ -388,6 +469,12 @@ export function prepareYoYData(data: EnrichedTransaction[], baseKey?: string): s
     // Daily breakdown for current month
     const currentDaily = aggregateDailyForMonth(data, latestMonth.year, latestMonth.month);
     payload += formatDailyBreakdown(currentDaily, currentAgg.label);
+
+    // Staff performance for both years
+    const lastYearStaff = aggregateStaffForMonth(data, lastYearMonth.year, lastYearMonth.month);
+    payload += formatStaffPerformance(lastYearStaff, lastYearAgg.label);
+    const currentStaff = aggregateStaffForMonth(data, latestMonth.year, latestMonth.month);
+    payload += formatStaffPerformance(currentStaff, currentAgg.label);
 
     return payload;
 }
@@ -442,6 +529,12 @@ export function prepareQuarterlyData(data: EnrichedTransaction[], baseKey?: stri
         payload += formatDailyBreakdown(daily, `${THAI_MONTHS[m.month]} ${m.year}`);
     });
 
+    // Staff performance for each month in the quarter
+    months.forEach(m => {
+        const staff = aggregateStaffForMonth(data, m.year, m.month);
+        payload += formatStaffPerformance(staff, `${THAI_MONTHS[m.month]} ${m.year}`);
+    });
+
     return payload;
 }
 
@@ -476,6 +569,10 @@ export function prepareMonthlyData(data: EnrichedTransaction[], baseKey?: string
     // Daily breakdown
     const daily = aggregateDailyForMonth(data, targetMonth.year, targetMonth.month);
     payload += formatDailyBreakdown(daily, agg.label);
+
+    // Staff performance
+    const staff = aggregateStaffForMonth(data, targetMonth.year, targetMonth.month);
+    payload += formatStaffPerformance(staff, agg.label);
 
     return payload;
 }

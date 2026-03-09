@@ -19,6 +19,7 @@ export const metadata: Metadata = {
 
 import { DataProvider } from "@/context/DataContext";
 import { ThemeProvider } from "@/components/ThemeProvider";
+import ChatBot from "@/components/ChatBot";
 
 export default function RootLayout({
   children,
@@ -33,6 +34,7 @@ export default function RootLayout({
         <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
           <DataProvider>
             {children}
+            <ChatBot />
           </DataProvider>
         </ThemeProvider>
       </body>
