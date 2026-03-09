@@ -11,6 +11,7 @@ interface Props {
 interface SpenderInfo {
     customerId: string;
     customerName: string;
+    phone?: string;
     totalSpend: number;
     visitCount: number;
     avgSpend: number;
@@ -22,6 +23,7 @@ export default function TopSpendersChart({ data }: Props) {
     const topSpenders = useMemo(() => {
         const customerMap: Record<string, {
             name: string;
+            phone?: string;
             totalSpend: number;
             visitCount: number;
             services: Record<string, number>;
@@ -35,6 +37,7 @@ export default function TopSpendersChart({ data }: Props) {
             if (!customerMap[id]) {
                 customerMap[id] = {
                     name: d['ลูกค้า']?.trim() || 'ไม่ระบุชื่อ',
+                    phone: d['เบอร์โทร']?.trim(),
                     totalSpend: 0,
                     visitCount: 0,
                     services: {},
@@ -60,6 +63,7 @@ export default function TopSpendersChart({ data }: Props) {
             return {
                 customerId: id,
                 customerName: info.name,
+                phone: info.phone,
                 totalSpend: info.totalSpend,
                 visitCount: info.visitCount,
                 avgSpend: info.visitCount > 0 ? info.totalSpend / info.visitCount : 0,
@@ -141,8 +145,13 @@ export default function TopSpendersChart({ data }: Props) {
                                             <span className="font-medium text-slate-900 dark:text-slate-100 whitespace-nowrap">
                                                 {spender.customerName}
                                             </span>
-                                            <span className="text-[11px] text-slate-400 dark:text-slate-500">
-                                                ID: {spender.customerId}
+                                            <span className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">
+                                                รหัส: {spender.customerId}
+                                                {spender.phone && spender.phone !== '-' && (
+                                                    <span className="inline-flex items-center ml-1 pl-1 border-l border-slate-300 dark:border-slate-600">
+                                                        โทร: {spender.phone}
+                                                    </span>
+                                                )}
                                             </span>
                                         </div>
                                     </td>
