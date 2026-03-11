@@ -5,11 +5,12 @@ import { useData } from '@/context/DataContext';
 import FileUpload from '@/components/FileUpload';
 import ServiceDashboard from '@/components/ServiceView/ServiceDashboard';
 import ProductDashboard from '@/components/ProductView/ProductDashboard';
+import StaffUtilizationDashboard from '@/components/StaffView/StaffUtilizationDashboard';
 import { ThemeToggle } from '@/components/ThemeToggle';
 
 export default function Home() {
   const { isDataLoaded } = useData();
-  const [activeTab, setActiveTab] = useState<'Service' | 'Product'>('Service');
+  const [activeTab, setActiveTab] = useState<'Service' | 'Product' | 'StaffUtilization'>('Service');
 
   if (!isDataLoaded) {
     return (
@@ -18,6 +19,14 @@ export default function Home() {
       </main>
     );
   }
+
+  const renderContent = () => {
+    switch (activeTab) {
+      case 'Service': return <ServiceDashboard />;
+      case 'Product': return <ProductDashboard />;
+      case 'StaffUtilization': return <StaffUtilizationDashboard />;
+    }
+  };
 
   return (
     <main className="min-h-screen bg-slate-50 dark:bg-slate-900 flex flex-col transition-colors duration-200">
@@ -48,6 +57,15 @@ export default function Home() {
             >
               Product Sales
             </button>
+            <button
+              onClick={() => setActiveTab('StaffUtilization')}
+              className={`px-4 py-2 rounded-md font-medium text-sm transition ${activeTab === 'StaffUtilization'
+                ? 'bg-violet-600 text-white shadow-md'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-700/50'
+                }`}
+            >
+              Staff Utilization
+            </button>
           </nav>
         </div>
 
@@ -72,7 +90,7 @@ export default function Home() {
 
       {/* Main Content Area */}
       <div className="flex-1 w-full max-w-[1920px] mx-auto p-4 md:p-8">
-        {activeTab === 'Service' ? <ServiceDashboard /> : <ProductDashboard />}
+        {renderContent()}
       </div>
     </main>
   );
